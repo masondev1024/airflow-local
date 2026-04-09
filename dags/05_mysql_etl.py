@@ -85,7 +85,30 @@ def _trasform(**kwargs):
 
 def _load(**kwargs):
     # csv => df => mysql 적제
-    
+    # 1. csv 경로 획득
+
+    # 2. csv -> df
+
+    # 3. mysql 연결 => MySqlHook 사용
+    mysql_hook = MySqlHook(mysql_conn_id='mysql_default')
+    conn       = mysql_hook.get_conn() # 커넥션 획득
+    # 7. 전체를 try ~ except로 감싸기(I/O)
+    try:
+        # 4. 커서를 획득하여 
+        with conn.cursor() as cursor:        
+            # 4-1. insert 구문 사용
+            #sql = ""
+            #params = []
+            #cursor.executemany( sql, params )
+            # 4-2. 커밋
+            #conn.commit()
+            pass        
+    except Exception as e:
+        pass
+    finally:
+        # 5. 연결 종료
+        if conn:
+            conn.close()
     
     pass
 
