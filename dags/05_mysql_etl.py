@@ -1,9 +1,25 @@
-
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 import logging 
+
+# 추가분
+from airflow.providers.mysql.operators.mysql import MysqlOperator
+# Load 처리시 sql에 전처리된 데이터를 밀어 넣을때 사용
+from airflow.providers.mysql.hooks.mysql import MySqlHook
+# 훅을 날려서 DB안에 테이블들로 데이터를 밀어넣는다고 생각해봐?
+
+# 데이터
+import json
 import random
+import pandas as pd # 소량의 데이터(데이터 규모)
+import os
+
+# 2. 환경변수
+# 프로젝트 내부 폴더에 데이터용으로 (~/dags/data) 지정
+# task 진행간 생성되는 파일을 동기화하도록 위치 지정 -> 향후 s3(데이터 레이크)로 대체 될 수 있음
+DATA_PATH = '/opt/airflow/dags/data' # 도커 내부에 생성된 컨테이너 상 워커의 airflow에서 지정된 데이터 위치
+os.mkdir(DATA_PATH, exist_ok=True)
 
 def _extract(**kwargs):
     pass
@@ -41,6 +57,7 @@ def _load(**kwargs):
 
 
 
+# 3. DAG 정의
 with DAG(
     dag_id = "05_mysql_etl",
     description="1개의 DAG에서 etl 수행 <-> n개의 DAG에서 수행",
@@ -54,21 +71,26 @@ with DAG(
     catchup     = False,           
     tags        = ['etl','mysql'],
 ) as dag:
-    t1 = PythonOperator(
+    task_create_table = MysqlOperator(
+        # 최초는 생성, 존재하면 pass => if not exists
+        task_id="create_table",
+        python_callable = _extract
+    )
+
+    task_extract = PythonOperator(
         task_id="extract",
         python_callable = _extract
     )
 
-    t2 = PythonOperator(
+    task_transform = PythonOperator(
         task_id="transform",
         python_callable = _transform
-    )
 
-    t3 = PythonOperator(
+    )
+    task_load = PythonOperator(
         task_id="load",
-        python_callable = _load
-
+        python_callable= _load
     )
 
 
-    t1 >> t2 >> t3
+    task_create_table >> task_extract >> task_transform >> task_load
