@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+logs/*
+airflow.db
+*.pid
+logs/**
