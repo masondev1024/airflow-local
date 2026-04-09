@@ -70,7 +70,7 @@ def _load(**kwargs):
 
 # 3. DAG 정의
 with DAG(
-    dag_id = "05_mysql_etl", 
+    dag_id = "05_mysql_etl_mycode", 
     default_args= {
         'owner' : 'de_2team_manager',        
         'retries' : 1,
