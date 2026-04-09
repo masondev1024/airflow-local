@@ -1,13 +1,19 @@
+from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from datetime import datetime, timedelta
-import logging 
-from airflow.providers.mysql.operators.mysql import MySqlOperator
+import logging
+# 추가분
+#from airflow.providers.mysql.operators.mysql import MysqlOperator
+# 범용 sql 오퍼레이터로 대체
+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
+# Load 처리시 sql에 전처리된 데이터를 밀어 넣을때 사용
 from airflow.providers.mysql.hooks.mysql import MySqlHook
+# 데이터
 import json
 import random
-import pandas as pd
+import pandas as pd  # 소량의 데이터(데이터 규모)
 import os
+
 
 # 1. 환경변수 및 경로 설정
 DATA_PATH = '/opt/airflow/dags/data'
