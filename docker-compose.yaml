@@ -302,6 +302,7 @@ services:
       MYSQL_PASSWORD: 1234
     ports:
       - "3306:3306"
+    # mysql 컨테이너가 삭제되도, 데이터는 보존가능 이유는 볼륨에 저장하기 때문
     volumes:
       - mysql-db-volume:/var/lib/mysql
     healthcheck:
@@ -314,4 +315,4 @@ services:
 volumes:
   postgres-db-volume:
       # mysql용 볼륨 -> 도커 엔진 내부에 공간 할당
-      mysql-db-volume:
+  mysql-db-volume:
