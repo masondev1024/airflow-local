@@ -1,78 +1,98 @@
 from airflow import DAG
-from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 from airflow.operators.python import PythonOperator
-from airflow.providers.mysql.hooks.mysql import MySqlHook
 from datetime import datetime, timedelta
-import logging
+import logging 
+from airflow.providers.mysql.operators.mysql import MySqlOperator
+from airflow.providers.mysql.hooks.mysql import MySqlHook
+import json
+import random
+import pandas as pd
+import os
 
-# 1. 전역 설정 (Connection ID는 Airflow UI에서 생성한 것과 일치해야 함)
-MYSQL_CONN_ID = 'mysql_default'
+# 1. 환경변수 및 경로 설정
+DATA_PATH = '/opt/airflow/dags/data'
+os.makedirs(DATA_PATH, exist_ok=True)
+
+# 2. 콜백 함수 정의
+def _extract(**kwargs):
+    # 수행 날짜 획득 (파일명 구분용)
+    ds = kwargs.get('ds')
+    data = [
+        {
+            "sensor_id" : f"SENSOR_{i+1}",
+            "timestamp" : datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "temperature" : round(random.uniform(20.0, 150.0), 2),
+            "status" : "on", 
+        } for i in range(10) 
+    ]
+    
+    file_path = f"{DATA_PATH}/sensor_data_{ds}.json"
+    with open(file_path, 'w') as f:
+        json.dump(data, f)
+    
+    # 다음 task를 위해 파일 경로를 XCom에 저장
+    kwargs['ti'].xcom_push(key='file_path', value=file_path)
+    logging.info(f"Saved to {file_path}")
 
 def _transform(**kwargs):
     ti = kwargs['ti']
-    # SQLExecuteQueryOperator의 결과는 기본적으로 XCom에 저장됨
-    raw_data = ti.xcom_pull(task_ids='extract_from_mysql')
+    # 파일 경로 가져오기
+    file_path = ti.xcom_pull(key='file_path', task_ids='extract')
     
-    if not raw_data:
-        raise ValueError("No data found in extract step")
+    if not file_path or not os.path.exists(file_path):
+        raise FileNotFoundError(f"No file found at {file_path}")
 
-    logging.info(f"Raw data extracted: {raw_data}")
+    # JSON 읽기 -> Pandas 변환
+    with open(file_path, 'r') as f:
+        raw_data = json.load(f)
     
-    # 예시: 첫 번째 컬럼 값에 10을 곱하는 변환 작업 (데이터 구조에 따라 수정 필요)
-    # raw_data는 보통 리스트 안의 튜플 형태 [(val1, val2), (val1, val2)]
-    transformed_data = [(row[0] * 10, row[1]) for row in raw_data]
+    df = pd.DataFrame(raw_data)
     
-    ti.xcom_push(key='transformed_result', value=transformed_data)
+    # 섭씨를 화씨로 변환 (C * 1.8 + 32)
+    df['temperature_f'] = (df['temperature'] * 1.8 + 32).round(2)
+    df.rename(columns={'temperature': 'temperature_c'}, inplace=True)
+    
+    # 변환된 데이터를 다시 JSON 혹은 CSV로 저장하거나 리스트로 전달
+    transformed_list = df.to_dict(orient='records')
+    ti.xcom_push(key='transformed_result', value=transformed_list)
 
 def _load(**kwargs):
     ti = kwargs['ti']
-    final_data = ti.xcom_pull(key='transformed_result', task_ids='transform_data')
+    final_data = ti.xcom_pull(key='transformed_result', task_ids='transform')
     
-    # Hook을 사용하여 DB 연산 수행
-    mysql_hook = MySqlHook(mysql_conn_id=MYSQL_CONN_ID)
-    
-    # 데이터 적재 전 대상 테이블 비우기 (Idempotency 보장)
-    mysql_hook.run("DELETE FROM target_table WHERE 1=1")
-    
-    # Bulk Insert 수행
-    mysql_hook.insert_rows(
-        table='target_table', 
-        rows=final_data,
-        target_fields=['value_column', 'name_column'] # 컬럼명 명시
-    )
-    logging.info(f"Successfully loaded {len(final_data)} rows.")
+    # MySqlHook을 이용한 적재 (Connection ID 확인 필요)
+    # mysql_hook = MySqlHook(mysql_conn_id='mysql_default')
+    # mysql_hook.insert_rows(table='sensor_readings', rows=final_data, ...)
+    logging.info(f"Final Data for Load: {final_data}")
 
+# 3. DAG 정의
 with DAG(
-    dag_id="05_mysql_etl_mixed",
-    default_args={
-        'owner': 'de_2team_manager',
-        'retries': 1,
-        'retry_delay': timedelta(minutes=1)
-    },
-    schedule_interval='@daily',
-    start_date=datetime(2026, 2, 25),
-    catchup=False,
-    tags=['etl', 'mysql', 'hybrid'],
+    dag_id = "05_mysql_etl",
+    default_args = {
+        'owner' : 'de_2team_manager', 
+        'retries' : 1, 
+        'retry_delay' : timedelta(minutes=1)
+    },      
+    schedule_interval = '@daily', 
+    start_date = datetime(2026,2,25), 
+    catchup = False,           
+    tags = ['etl','mysql'],
 ) as dag:
 
-    # [Extract] 전용 Operator 사용 (SQL 기반)
-    t1 = SQLExecuteQueryOperator(
-        task_id="extract_from_mysql",
-        conn_id=MYSQL_CONN_ID,
-        sql="SELECT id_value, name_text FROM source_table", # 실제 테이블명으로 수정
-        do_xcom_push=True # 결과를 XCom에 저장
+    task_extract = PythonOperator(
+        task_id="extract",
+        python_callable=_extract
     )
 
-    # [Transform] Python의 유연함 활용
-    t2 = PythonOperator(
-        task_id="transform_data",
+    task_transform = PythonOperator(
+        task_id="transform",
         python_callable=_transform
     )
 
-    # [Load] Hook을 활용한 고성능 적재
-    t3 = PythonOperator(
-        task_id="load_to_mysql",
+    task_load = PythonOperator(
+        task_id="load",
         python_callable=_load
     )
 
-    t1 >> t2 >> t3
+    # 수정된 부분: 존재하지 않는 task_create_table 제거
+    task_extract >> task_transform >> task_load
