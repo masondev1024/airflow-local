@@ -111,6 +111,5 @@ with DAG(
         task_id = "load",
         python_callable = _load
     )
-
     task_create_table >> task_load    
 

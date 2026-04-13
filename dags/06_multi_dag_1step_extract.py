@@ -69,20 +69,20 @@ with DAG(
     # 신규 추가 오퍼레이터로 만든 New Task
     # 다음 dag를 실행시키는 트리거 역할
     trigger_transform_dag_run = TriggerDagRunOperator(
-    task_id="trigger_transform",
-    trigger_dag_id="06_multi_dag_2step_transform", # 구동시킬 DAG id
+        task_id="trigger_transform",
+        trigger_dag_id="06_multi_dag_2step_transform", # 구동시킬 DAG id
 
-    # 전달할 데이터 -> xcom을 통해서 획득 가능(동일 dag에 존재 -> jinja 템플릿 활용)
-    conf={
-        # f"{DATA_PATH}/sensor_data_{{ ds_nodash }}.json"  # 여기서 전달
-        " json_path": "{{ task_instance.xcom_pull(task_ids='extract')}}"
-    },
+        # 전달할 데이터 -> xcom을 통해서 획득 가능(동일 dag에 존재 -> jinja 템플릿 활용)
+        conf={
+            # f"{DATA_PATH}/sensor_data_{{ ds_nodash }}.json"  # 여기서 전달
+            " json_path": "{{ task_instance.xcom_pull(task_ids='extract')}}"
+        },
 
-    # dag 수행시간 세팅 => 동일하게 맞추겠다. PythonOperator의 작동시간과 (컨셉)
-    # 1개의 DAG에서 task 간 시간차와 유사하게 혹은 동일하게 맞추고자 하는 것.(굳이긴함)
-    reset_dag_run= True,
+        # dag 수행시간 세팅 => 동일하게 맞추겠다. PythonOperator의 작동시간과 (컨셉)
+        # 1개의 DAG에서 task 간 시간차와 유사하게 혹은 동일하게 맞추고자 하는 것.(굳이긴함)
+        reset_dag_run= True,
 
-    wait_for_completion=False # 다음 DAG 실행을 기다릴지 여부
-)
+        wait_for_completion=False # 다음 DAG 실행을 기다릴지 여부
+    )
     
     task_extract >> trigger_transform_dag_run

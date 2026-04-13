@@ -311,7 +311,14 @@ services:
       timeout: 5s
       retries: 5
       
-      
+  # fast api 서버 추가
+  ai-api-server:
+    build: ./api_server # build 는 도커파일에서 이미지 가져오는것 , image는 도커 허브에서 가져오는 것
+    container_name: airflow-class-api
+    ports:
+      - "8000:8000"
+    networks:
+      - default
 volumes:
   postgres-db-volume:
       # mysql용 볼륨 -> 도커 엔진 내부에 공간 할당

@@ -64,7 +64,7 @@ def predict(users:List[ReqData]): # 요청 데이터 형태를 규정 -> 유효�
         '''
         # 2. 고객 1명당 신용평가 수행( AI x, 간단한 가상 공식사용) => 차후 실제 모델과 교체
         사전식  = (user.income//1000)*10
-        credit_score = min( random.randint(300,600) + 사전식,900)
+        credit_score = min(random.randint(300, 600) + 사전식 - (user.loan_amt // 100), 900)
         if credit_score>= 800: grade='A'
         elif credit_score >=600 : grade='B' 
         else: grade = 'C'
