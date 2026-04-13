@@ -1,29 +1,21 @@
-
-# 1. 모듈 가져오기
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 import logging
-from airflow.operators.trigger_dagrun import TriggerDagRunOperator
-# 데이터
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator # 핵심
 import json
-import pandas as pd  # 소량의 데이터(데이터 규모)
+import random
+import pandas as pd
 import os
 
-# 2. 기본설정
-# 프로젝트 내부 폴더를 데이터용으로 (~/dags/data)지정
-# task 진행간 생성되는 파일을 동기화하도록 위치 지정 -> 향후 s3(데이터 레이크)로 대체 될수 있음
-
-# 도커 내부에 생성된 컨테이너 상 워커내의 airflow 상의 지정한 데이터 위치
 DATA_PATH = '/opt/airflow/dags/data'
 os.makedirs(DATA_PATH, exist_ok=True)
 
-
-def _trasform(**kwargs):
-    # _extract에서 추출한 데이터를 다른 Dag에서 전달한 conf를 활용하여 추출 -> "dag_run"
-    # 1. XCOM을 통해서 이전 task에서 전달한 데이터 획득
+def _transform(**kwargs):
+    # _extract에서 추출한 데이터를 다른 Dag 에서 전달한 conf를 활용하여 추출 -> "dag_run" 활용
+    # 1. dag_run을 통해서 이전 task에서 전달한 데이터 획득
     dag_run = kwargs['dag_run']
-    json_file_path = dag_run.conf.get('file_path')
+    json_file_path = dag_run.conf.get('json_path')
     # 로그 출력
     logging.info(f'전달받은 데이터 {json_file_path}')
 
@@ -48,8 +40,6 @@ def _trasform(**kwargs):
     # 5. csv 경로 xcom을 통해서 개시
     return file_path
 
-
-# 3. DAG 정의
 with DAG(
     dag_id      = "06_multi_dag_2step_transform", 
     description = "transform 전용 DAG",
@@ -63,19 +53,20 @@ with DAG(
     catchup     = False,
     tags        = ['transform', 'etl'],
 ) as dag:
-    
-    task_trasform   = PythonOperator(
+    task_transform   = PythonOperator(
         task_id = "transform",
-        python_callable = _trasform
+        python_callable = _transform
     )
-    trigger_load_dag_run = TriggerDagRunOperator(
-    task_id="trigger_load",
-    trigger_dag_id="06_multi_dag_3step_load", # 구동시킬 DAG id
-    conf={
-        # f"{DATA_PATH}/sensor_data_{{ ds_nodash }}.json"  # 여기서 전달
-        " json_path": "{{ task_instance.xcom_pull(task_ids='transform')}}"
-    },
-    reset_dag_run= True,
-    wait_for_completion=False 
- )
-    task_trasform >> trigger_load_dag_run
+    # 실습 : TriggerDagRunOperator 반영, 의존성까지 적용
+    #       전달할 데이터의 키값 csv_path로 지정
+    task_trigger_load_dag_run = TriggerDagRunOperator(
+        task_id = "trigger_load",
+        trigger_dag_id = "06_multi_dag_3step_load",
+        conf    = {
+            "csv_path":"{{ task_instance.xcom_pull(task_ids='transform') }}"
+        },
+        reset_dag_run= True,
+        wait_for_completion = False 
+    )
+    # 의존성
+    task_transform >> task_trigger_load_dag_run

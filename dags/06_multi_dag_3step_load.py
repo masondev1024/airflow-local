@@ -28,11 +28,11 @@ os.makedirs(DATA_PATH, exist_ok=True)
 def _load(**kwargs):
     # csv => df => mysql 적제
     # 1. csv 경로 획득 => XCom을 통해서 이전 task(게시자)의 id를 이용하여 추출
-    ti = kwargs['ti']
-    csv_file_path =ti.xcom_pull(task_ids='transform')
+    dag_run = kwargs['dag_run']
+    csv_path = dag_run.conf.get('csv_path')
 
     # 2. csv -> df (도입 근거 => 소규모 데이터라 데이터프레임, 대규모는 스파크 사용)
-    df = pd.read_csv(csv_file_path) # 판다스는 데이터 분석, 전처리에 사용
+    df = pd.read_csv(csv_path) # 판다스는 데이터 분석, 전처리에 사용
 
     # 3. mysql 연결 => MySqlHook 사용
     mysql_hook = MySqlHook(mysql_conn_id='mysql_default')
@@ -87,8 +87,30 @@ with DAG(
     tags        = ['load', 'etl'],
 ) as dag:
     # 4. task 정의
+    task_create_table = SQLExecuteQueryOperator(
+        # 테이블 생성, if not exists를 사용하여 무조건 sql이 일단 수행되게 구성 
+        # -> 아니라면 fail 발생함(2회차부터)
+        # 최초는 생성, 존재하면 pass => if not exists
+        task_id = "create_table",
+        # 연결정보
+        conn_id = "mysql_default", # 대시보드에 admin>connectinos>하위에 사전 등록
+        # sql
+        sql = '''
+            CREATE TABLE IF NOT EXISTS sensor_readings (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                sensor_id VARCHAR(50),
+                timestamp DATETIME,
+                temperature_c FLOAT,
+                temperature_f FLOAT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        '''
+    )
+    
     task_load       = PythonOperator(
         task_id = "load",
         python_callable = _load
     )
+
+    task_create_table >> task_load    
 
