@@ -1,6 +1,4 @@
-'''
-- etl 간단하게 적용, 스마트팩토리상 온도 센서에 대한 ETL 처리, mysql 사용
-'''
+
 # 1. 모듈 가져오기
 from datetime import datetime, timedelta
 from airflow import DAG
@@ -26,32 +24,6 @@ import os
 DATA_PATH = '/opt/airflow/dags/data'
 os.makedirs(DATA_PATH, exist_ok=True)
 
-def _extract(**kwargs):
-    # 스마트팩토리에 설치된 오븐 온도 센서에서  데이터가 발생되면 데이터레이크(s3, 어딘가에 존재)
-    # 에 쌓이고 있다 (가정) => 추출해서 가져오는 단계로 가정
-    
-    # 더미 데이터 고려 구성 -> 1회성으로 10건 구성 -> [ {}, {}, ... ]
-    data  = [
-        { 
-            "sensor_id" : f"SENSOR_{i+1}", # 장비 ID
-            "timestamp" : datetime.now().strftime("%Y-%m-%d %H:%M:%S"), # YYYY-MM-DD hh:mm:ss
-            "temperature": round( random.uniform(20.0, 150.0), 2),
-            "status" : "on", # "off"
-        } for i in range(10)   ]
-
-    # 더미 데이터를 파일로 저장 (로그파일처럼) -> json 형태
-    # /opt/airflow/dags/data/sensor_data_DAG수행날짜.json
-    # 실습 -> 위의 데이터를 위의 형식으로 저장하시오 ( json.dump(data, f) )
-    file_path = f'{DATA_PATH}/sensor_data_{ kwargs['ds_nodash'] }.json'
-    with open(file_path, 'w') as f:
-        json.dump(data, f)
-
-    # 로그는 별도의 프로그램에서 지속적으로 발생시켜야 함(시뮬레이션 기준)
-    # 현재는 편의상 airflow에 포함시킴 
-
-    # XCOM을 통해서  task_trasform에게 전달 (로그의 경로를 전달, 실 데이터 전달 x(지양))
-    logging.info(f'extract 한 로그 데이터 { file_path } ')
-    return file_path
 
 def _trasform(**kwargs):
     # _extract에서 추출한 데이터를 XCom을 통해서 획득    
@@ -83,52 +55,6 @@ def _trasform(**kwargs):
     return file_path
     pass
 
-def _load(**kwargs):
-    # csv => df => mysql 적제
-    # 1. csv 경로 획득 => XCom을 통해서 이전 task(게시자)의 id를 이용하여 추출
-    ti = kwargs['ti']
-    csv_file_path =ti.xcom_pull(task_ids='transform')
-
-    # 2. csv -> df (도입 근거 => 소규모 데이터라 데이터프레임, 대규모는 스파크 사용)
-    df = pd.read_csv(csv_file_path) # 판다스는 데이터 분석, 전처리에 사용
-
-    # 3. mysql 연결 => MySqlHook 사용
-    mysql_hook = MySqlHook(mysql_conn_id='mysql_default')
-    
-    conn       = mysql_hook.get_conn() 
-    # 커넥션 획득 -> 입출력 연산 영향 있음(예외처리, with문 염두)(with문을 통해 open,close를 활용하지 않았다면 마지막에 무조건 닫는 코드 존재)
-    
-    # 7. 전체를 try ~ except로 감싸기(I/O)
-    try:
-        # 4. 커서를 획득하여 
-        with conn.cursor() as cursor:        
-            # 4-1. insert 구문 사용
-            sql = '''
-                insert into sensor_readings
-                (sensor_id, timestamp,temperature_c, temperature_f)
-                values (%s, %s, %s, %s)
-            '''
-
-            params = [
-                (data['sensor_id'],data['timestamp'],data['temperature'],data['temperature_f'])
-                for _ ,data in df.iterrows() # 데이터가 없을때까지 반복 -> 데이터가 한세트씩 추출
-                # 위의 iterrows() 출력값 : sensor_id: (0,SENSOR_1), (1,timestamp: ...),(2, temperature: 25.5 )...
-            ]
-            logging.info(f'입력한 데이터(파라미터) {params}')
-            cursor.executemany( sql, params ) # 한번에 데이터 밀어넣기
-            # 4-2. 커밋
-            conn.commit()
-            logging.info(f'mysql에 적재 완료')
-            pass        
-    except Exception as e:
-        logging.info(f'적재 오류 {e}')
-        pass
-    finally:
-        # 5. 연결 종료
-        if conn:
-            conn.close()
-            logging.info(f'mysql 연결 종료')
-    pass
 
 # 3. DAG 정의
 with DAG(
@@ -149,7 +75,3 @@ with DAG(
         task_id = "transform",
         python_callable = _trasform
     )
-  
-    # 5. 의존성 정의 -> 시나리오별 준비 
-    task_trasform 
-    #task_extract >> task_trasform >> task_load

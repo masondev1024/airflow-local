@@ -1,6 +1,4 @@
-'''
-- etl 간단하게 적용, 스마트팩토리상 온도 센서에 대한 ETL 처리, mysql 사용
-'''
+
 # 1. 모듈 가져오기
 from datetime import datetime, timedelta
 from airflow import DAG
@@ -94,6 +92,3 @@ with DAG(
         python_callable = _load
     )
 
-    # 5. 의존성 정의 -> 시나리오별 준비 
-    task_load
-    #task_extract >> task_trasform >> task_load

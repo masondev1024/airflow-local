@@ -1,21 +1,14 @@
 '''
-- etl 간단하게 적용, 스마트팩토리상 온도 센서에 대한 ETL 처리, mysql 사용
+DAG -> DAG 작동시키는(오퍼레이터) 트리거 필요함 -> 핵심
 '''
 # 1. 모듈 가져오기
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 import logging
-# 추가분
-#from airflow.providers.mysql.operators.mysql import MysqlOperator
-# 범용 sql 오퍼레이터로 대체
-from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
-# Load 처리시 sql에 전처리된 데이터를 밀어 넣을때 사용
-from airflow.providers.mysql.hooks.mysql import MySqlHook
-# 데이터
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 import json
 import random
-import pandas as pd  # 소량의 데이터(데이터 규모)
 import os
 
 # 2. 기본설정
@@ -67,33 +60,29 @@ with DAG(
     catchup     = False,
     tags        = ['etl', 'extract'],
 ) as dag:
-    # 4. task 정의
-    task_create_table = SQLExecuteQueryOperator(
-        # 테이블 생성, if not exists를 사용하여 무조건 sql이 일단 수행되게 구성 
-        # -> 아니라면 fail 발생함(2회차부터)
-        # 최초는 생성, 존재하면 pass => if not exists
-        task_id = "create_table",
-        # 연결정보
-        conn_id = "mysql_default", # 대시보드에 admin>connectinos>하위에 사전 등록
-        # sql
-        sql = '''
-            CREATE TABLE IF NOT EXISTS sensor_readings (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                sensor_id VARCHAR(50),
-                timestamp DATETIME,
-                temperature_c FLOAT,
-                temperature_f FLOAT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-        '''
-    )
-    
+
     task_extract    = PythonOperator(
         task_id = "extract",
         python_callable = _extract
     )
+
+    # 신규 추가 오퍼레이터로 만든 New Task
+    # 다음 dag를 실행시키는 트리거 역할
+    trigger_transform_dag_run = TriggerDagRunOperator(
+    task_id="trigger_transform",
+    trigger_dag_id="06_multi_dag_2step_transform", # 구동시킬 DAG id
+
+    # 전달할 데이터 -> xcom을 통해서 획득 가능(동일 dag에 존재 -> jinja 템플릿 활용)
+    conf={
+        # f"{DATA_PATH}/sensor_data_{{ ds_nodash }}.json"  # 여기서 전달
+        " json_path": "{{ task_instance.xcom_pull(task_ids='extract')}}"
+    },
+
+    # dag 수행시간 세팅 => 동일하게 맞추겠다. PythonOperator의 작동시간과 (컨셉)
+    # 1개의 DAG에서 task 간 시간차와 유사하게 혹은 동일하게 맞추고자 하는 것.(굳이긴함)
+    reset_dag_run= True,
+
+    wait_for_completion=False # 다음 DAG 실행을 기다릴지 여부
+)
     
-
-
-    # 5. 의존성 정의 -> 시나리오별 준비 
-    task_create_table >> task_extract
+    task_extract >> trigger_transform_dag_run
