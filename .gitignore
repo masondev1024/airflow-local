@@ -210,4 +210,4 @@ __marimo__/
 # 기존 로그 제거 
 # git rm -r --cached logs/
 logs/
-logs/**
+logs/***.msi

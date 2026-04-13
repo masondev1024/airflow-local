@@ -85,31 +85,48 @@ def _trasform(**kwargs):
 
 def _load(**kwargs):
     # csv => df => mysql 적제
-    # 1. csv 경로 획득
+    # 1. csv 경로 획득 => XCom을 통해서 이전 task(게시자)의 id를 이용하여 추출
+    ti = kwargs['ti']
+    csv_file_path =ti.xcom_pull(task_ids='transform')
 
-    # 2. csv -> df
+    # 2. csv -> df (도입 근거 => 소규모 데이터라 데이터프레임, 대규모는 스파크 사용)
+    df = pd.read_csv(csv_file_path) # 판다스는 데이터 분석, 전처리에 사용
 
     # 3. mysql 연결 => MySqlHook 사용
     mysql_hook = MySqlHook(mysql_conn_id='mysql_default')
-    conn       = mysql_hook.get_conn() # 커넥션 획득
+    
+    conn       = mysql_hook.get_conn() 
+    # 커넥션 획득 -> 입출력 연산 영향 있음(예외처리, with문 염두)(with문을 통해 open,close를 활용하지 않았다면 마지막에 무조건 닫는 코드 존재)
+    
     # 7. 전체를 try ~ except로 감싸기(I/O)
     try:
         # 4. 커서를 획득하여 
         with conn.cursor() as cursor:        
             # 4-1. insert 구문 사용
-            #sql = ""
-            #params = []
-            #cursor.executemany( sql, params )
+            sql = '''
+                insert into sensor_readings
+                (sensor_id, timestamp,temperature_c, temperature_f)
+                values (%s, %s, %s, %s)
+            '''
+
+            params = [
+                (data['sensor_id'],data['timestamp'],data['temperature_c'],data['temperature_f'])
+                for _ ,data in df.iterrows() # 데이터가 없을때까지 반복 -> 데이터가 한세트씩 추출
+            ]
+            logging.info(f'입력한 데이터(파라미터) {params}')
+            cursor.executemany( sql, params ) # 한번에 데이터 밀어넣기
             # 4-2. 커밋
-            #conn.commit()
+            conn.commit()
+            logging.info('mysql에 적재 완료')
             pass        
     except Exception as e:
+        logging.info('적재 오류 {e}')
         pass
     finally:
         # 5. 연결 종료
         if conn:
             conn.close()
-    
+            logging.info(f'mysql 연결 종료')
     pass
 
 # 3. DAG 정의
