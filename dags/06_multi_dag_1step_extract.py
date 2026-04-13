@@ -75,7 +75,7 @@ with DAG(
         # 전달할 데이터 -> xcom을 통해서 획득 가능(동일 dag에 존재 -> jinja 템플릿 활용)
         conf={
             # f"{DATA_PATH}/sensor_data_{{ ds_nodash }}.json"  # 여기서 전달
-            " json_path": "{{ task_instance.xcom_pull(task_ids='extract')}}"
+            "json_path": "{{ task_instance.xcom_pull(task_ids='extract')}}"
         },
 
         # dag 수행시간 세팅 => 동일하게 맞추겠다. PythonOperator의 작동시간과 (컨셉)
