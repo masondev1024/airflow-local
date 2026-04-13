@@ -132,8 +132,8 @@ def _load(**kwargs):
 
 # 3. DAG 정의
 with DAG(
-    dag_id      = "05_mysql_etl", 
-    description = "etl 수행하여 mysql에 온도 센서 데이터 적제",
+    dag_id      = "06_multi_dag_2step_transform", 
+    description = "transform 전용 DAG",
     default_args= {
         'owner'             : 'de_2team_manager',        
         'retries'           : 1,
@@ -142,42 +142,14 @@ with DAG(
     schedule_interval = '@daily',
     start_date  = datetime(2026,2,25),     
     catchup     = False,
-    tags        = ['mysql', 'etl'],
+    tags        = ['transform', 'etl'],
 ) as dag:
-    # 4. task 정의
-    task_create_table = SQLExecuteQueryOperator(
-        # 테이블 생성, if not exists를 사용하여 무조건 sql이 일단 수행되게 구성 
-        # -> 아니라면 fail 발생함(2회차부터)
-        # 최초는 생성, 존재하면 pass => if not exists
-        task_id = "create_table",
-        # 연결정보
-        conn_id = "mysql_default", # 대시보드에 admin>connectinos>하위에 사전 등록
-        # sql
-        sql = '''
-            CREATE TABLE IF NOT EXISTS sensor_readings (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                sensor_id VARCHAR(50),
-                timestamp DATETIME,
-                temperature_c FLOAT,
-                temperature_f FLOAT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-        '''
-    )
     
-    task_extract    = PythonOperator(
-        task_id = "extract",
-        python_callable = _extract
-    )
     task_trasform   = PythonOperator(
         task_id = "transform",
         python_callable = _trasform
     )
-    task_load       = PythonOperator(
-        task_id = "load",
-        python_callable = _load
-    )
-
+  
     # 5. 의존성 정의 -> 시나리오별 준비 
-    task_create_table >> task_extract >> task_trasform >> task_load
+    task_trasform 
     #task_extract >> task_trasform >> task_load
