@@ -4,15 +4,9 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 import logging
-# 추가분
-#from airflow.providers.mysql.operators.mysql import MysqlOperator
-# 범용 sql 오퍼레이터로 대체
-from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
-# Load 처리시 sql에 전처리된 데이터를 밀어 넣을때 사용
-from airflow.providers.mysql.hooks.mysql import MySqlHook
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 # 데이터
 import json
-import random
 import pandas as pd  # 소량의 데이터(데이터 규모)
 import os
 
@@ -26,10 +20,10 @@ os.makedirs(DATA_PATH, exist_ok=True)
 
 
 def _trasform(**kwargs):
-    # _extract에서 추출한 데이터를 XCom을 통해서 획득    
+    # _extract에서 추출한 데이터를 다른 Dag에서 전달한 conf를 활용하여 추출 -> "dag_run"
     # 1. XCOM을 통해서 이전 task에서 전달한 데이터 획득
-    ti = kwargs['ti']
-    json_file_path = ti.xcom_pull(task_ids='extract')
+    dag_run = kwargs['dag_run']
+    json_file_path = dag_run.conf.get('file_path')
     # 로그 출력
     logging.info(f'전달받은 데이터 {json_file_path}')
 
@@ -53,7 +47,6 @@ def _trasform(**kwargs):
 
     # 5. csv 경로 xcom을 통해서 개시
     return file_path
-    pass
 
 
 # 3. DAG 정의
@@ -75,3 +68,14 @@ with DAG(
         task_id = "transform",
         python_callable = _trasform
     )
+    trigger_load_dag_run = TriggerDagRunOperator(
+    task_id="trigger_load",
+    trigger_dag_id="06_multi_dag_3step_load", # 구동시킬 DAG id
+    conf={
+        # f"{DATA_PATH}/sensor_data_{{ ds_nodash }}.json"  # 여기서 전달
+        " json_path": "{{ task_instance.xcom_pull(task_ids='transform')}}"
+    },
+    reset_dag_run= True,
+    wait_for_completion=False 
+ )
+    task_trasform >> trigger_load_dag_run
