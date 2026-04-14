@@ -11,10 +11,10 @@ import os
 DATA_PATH = '/opt/airflow/dags/data'
 os.makedirs(DATA_PATH, exist_ok=True)
 
-def _transform(**kwargs):
+def _transform(**kwargs): # 여기서 kwargs는 extract를 통해 전달받은 context 
     # _extract에서 추출한 데이터를 다른 Dag 에서 전달한 conf를 활용하여 추출 -> "dag_run" 활용
     # 1. dag_run을 통해서 이전 task에서 전달한 데이터 획득
-    dag_run = kwargs['dag_run']
+    dag_run = kwargs['dag_run'] # extract DAG의 정보 꾸러미(ds,ti,dag_run)중 실행중이던 extract DAG의 전체 정보를 변수에 저장
     json_file_path = dag_run.conf.get('json_path')
     # 로그 출력
     logging.info(f'전달받은 데이터 {json_file_path}')
@@ -34,7 +34,7 @@ def _transform(**kwargs):
     # 파일명 준비 /opt/airflow/dags/data/preprocessing_data_DAG수행날짜.csv
     file_path = f'{DATA_PATH}/preprocessing_data_{ kwargs['ds_nodash'] }.csv'
     # 저장
-    target_df.to_csv( file_path, index=False ) # 인덱스 제외
+    target_df.to_csv( file_path, index=False ) # 설정안해주면 맨 앞 컬럼에 인덱스 생기기 때문에 인덱스 제외 index=False
     logging.info(f'전처리후 csv 저장 완료 {file_path}') # airflow가 aws에서 가동되면 s3로 저장
 
     # 5. csv 경로 xcom을 통해서 개시

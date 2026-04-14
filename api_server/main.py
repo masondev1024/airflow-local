@@ -21,11 +21,10 @@ import random # 신용평가 더미 데이터 생성용
 
 # 2. FastAPI 앱(객체) 생성
 #    해당 변수명은 uvicorn에서 구동시 `모델명:FastAPI객체명`에서 객체명 해당
-
 app = FastAPI() # dockerfile에 있는 fastapi 객체명 동기화 필수 이름 다르면 안됨
 
 # 3. 요청/응답 데이터의 구조를 정의 + 유효성 검사의 틀을 제공하는 클래스 구성 -> pydantic 사용
-#   BaseModel을 상속받고 -> pydantic 사용 가능함 -> 틀/구조 정의
+#   BaseModel을 상속받고 -> pydantic 사용 -> 틀/구조 정의
 # class의 구성원들중 클래스 멤버 -> 키값 활용 -> 타입 부여 -> 유효성 검사를 위해서
 class ReqData(BaseModel):
     # 사용자 아이디, 소득, 대출총량
