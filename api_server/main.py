@@ -75,4 +75,4 @@ def predict(users:List[ReqData]): # 요청 데이터 형태를 규정 -> 유효�
         })
     # 4. 결과 반환
         pass
-    return results
+    return results # json 형태의 문자열을 반환 위에서 저장한대로 리스트안에 딕셔너리 형태로 반환되지 x
