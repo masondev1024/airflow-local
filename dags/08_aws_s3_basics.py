@@ -19,7 +19,7 @@ from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 # 827913617635 : 루트 계정 ID
 # 리전 : ap-northeast-2
 # 2-1. 버킷명 (iam계정-827913617635-리전-an)
-BUCKET_NAME = "de-ai-30-827913617635-ap-northeast-2-an" # 글로벌하게 고유한 이름 사용!!
+BUCKET_NAME = "de-ai-06-827913617635-ap-northeast-2-an" # 글로벌하게 고유한 이름 사용!!
 # 2-2. 업로드할 파일명 준비
 FILE_NAME   = 'hello.txt' 
 # 2-3. 업로드할 파일의 로컬내 위치 -> 컨테이너 기반
@@ -55,10 +55,10 @@ with DAG(
     tags        = ['aws', 's3'],
 )as dag:
     # 4. Task 정의 
-    # task_create_file = BashOperator(
-    #     task_id = "create_file",
-    #     bash_command = f'echo "hello airflow & s3" > {LOCAL_PATH}'
-    # )
+    task_create_file = BashOperator(
+        task_id = "create_file",
+        bash_command = f'echo "hello airflow & s3" > {LOCAL_PATH}'
+    )
     task_upload_to_s3 = LocalFilesystemToS3Operator(
         task_id  = "upload_to_s3",
         filename = LOCAL_PATH,  # 로컬PC등 원본 리소스의 위치(파일명 포함)
@@ -73,6 +73,5 @@ with DAG(
     )
 
     # 5. 의존성
-    #task_create_file >> 
-    task_upload_to_s3 >> task_check_s3
+    task_create_file >> task_upload_to_s3 >> task_check_s3
     pass
