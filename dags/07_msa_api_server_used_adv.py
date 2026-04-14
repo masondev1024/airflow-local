@@ -63,6 +63,26 @@ def _create_dummy_data(**kwargs):
 
 
 def _extract_data(**kwargs):
+    # 현재는 mysql에서 조회하여 획득
+    # 차후는 데이터의 위치에 따라 => Athena, opensearch등 통해서 획득
+    # DB -> MySqlHook -> Pandas -> List[dict,dict,...]
+    mysql_hook = MySqlHook(mysql_conn_id='mysql_default')
+    # sql -> df 구성
+    # 신용평가 점수가 없는 고객만 대상(향후, 갱신기간이 도래한 고객까지 포함)
+    df = mysql_hook.get_pandas_df('''
+        select 
+            user_id, income, loan_amt 
+        from
+            customers
+        where
+            credit_score is NULL                     
+    ''')        
+    # 결과셋 체크
+    if df.empty:
+        logging.info('신규 고객 없음')
+        return [] # 대상이 없는거지 에러가 아니기 때문 빈리스트 반환
+    # 변환 -> xcom 전달
+    return df.to_dict(orient='records') # 리스트를 딕셔너리로 변환해줘 전달해 다음 task에서 전달받을 때 json 형태로 확인가능
     pass
 
 def _api_service_call(**kwargs):
@@ -70,7 +90,7 @@ def _api_service_call(**kwargs):
     # 1. 이전 task의 결과물 획득 
     #    (차후 -> 데이터레이크(s3), athena, redshift, opensearch(엘라스틱서치 aws버전),..등 서비스 통해서 획득)
     ti         = kwargs['ti']
-    users_data = ti.xcom_pull(task_ids='task_create_dummy_data')
+    users_data = ti.xcom_pull(task_ids='task_extract_data')
     logging.info(f'요청시 전달 데이터 {users_data}')
     # 2. 신용 평가 요청 및 응답 -> api 호출 (차후 LLM 모델과 연계 가능) -> 통신 -> I/O -> 예외처리
     try:
@@ -102,25 +122,39 @@ def _load_users_credit(**kwargs):
     with mysql_hook.get_conn() as conn:        
         with conn.cursor() as cursor:
             # 3. 테이블이 없으면 생성(임시편성) -> 추후 사전 작업으로 이동
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS customers (
-                    user_id VARCHAR(50) PRIMARY KEY,
-                    income INT DEFAULT NULL,
-                    loan_amt INT DEFAULT NULL,
-                    credit_score INT DEFAULT NULL,
-                    grade VARCHAR(10) DEFAULT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
+            # cursor.execute('''
+            #     CREATE TABLE IF NOT EXISTS customers (
+            #         user_id VARCHAR(50) PRIMARY KEY,
+            #         income INT DEFAULT NULL,
+            #         loan_amt INT DEFAULT NULL,
+            #         credit_score INT DEFAULT NULL,
+            #         grade VARCHAR(10) DEFAULT NULL,
+            #         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            #     )
+            # ''')
             # 4. 신용평가 별과 삽입(추후 고객 정보 업데이트로 조정)
+            # sql = '''
+            #     insert into customers
+            #     (user_id, credit_score, grade)
+            #     values
+            #     (%s, %s, %s)
+            #     ON DUPLICATE KEY UPDATE
+            #         credit_score = VALUES(credit_score),  
+            #         grade = VALUES(grade);
+            # '''
             sql = '''
-                insert into customers
-                (user_id, credit_score, grade)
-                values
-                (%s, %s, %s)
+                update customers
+                set credit_score=%s, grade=%s
+                where user_id=%s
             '''
+# 선택기준 
+# 이 파이프라인이 **"이미 우리 DB에 등록된 것이 
+# 확실한 고객들의 정보만 갱신"**하는 목적이라면 지금 작성하신 UPDATE가 맞다
+# 그러나 **"새로운 고객의 신용 평가 결과가 DB에 누락 없이 무조건 저장"**되어야 하는 강건성(Robustness)이 
+# 요구된다면, 주석 처리하신 ON DUPLICATE KEY UPDATE 방식이 더 안전한 설계입니다.
+                    
             params = [
-                ( data['user_id'], data['credit_score'], data['grade'])
+                ( data['credit_score'], data['grade'],data['user_id'])
                 for data in users_grade
             ]
             cursor.executemany( sql, params )
@@ -169,4 +203,4 @@ with DAG(
     )
 
     # 5. 의존성, 각 task는 xCom 통신으로 데이터 공유
-    task_create_dummy_data # >> task_extract_data >> task_api_service_call >> task_load_users_credit
+    task_create_dummy_data >> task_extract_data >> task_api_service_call >> task_load_users_credit
