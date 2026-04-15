@@ -33,6 +33,13 @@ def make_log(config, generator_instance):
 
     print('-' * 50)
 
+log_gen_g = LogGenerator()
+def make_one_log():
+
+    return json.dumps( log_gen_g.finance(), ensure_ascii=False ) 
+    # dict -> json형태의 str : 객체 직렬화 ( 외부로 던져야 되기 때문에 문자열로 바꿔줘야 함 저번에 post 요청때처럼)
+  
+
 if __name__ == '__main__':
     # 인스턴스 생성
     log_gen = LogGenerator()
@@ -48,3 +55,4 @@ if __name__ == '__main__':
 
     # 함수 실행
     make_log(config, log_gen)
+    make_one_log()
