@@ -6,7 +6,7 @@ from datetime import datetime
 from faker import Faker
 
 
-fake= Faker('ko_KR')
+fake= Faker('ko_KR') # 가짜 데이터(Mock Data) 생성 라이브러리
 
 
 class LogGenerator: # 클래스를 정의하고 이를 기반으로 객체를 생성 -> 클래스는 붕어빵틀이라고 생각하고 객체는 붕어빵
@@ -15,7 +15,7 @@ class LogGenerator: # 클래스를 정의하고 이를 기반으로 객체를 �
         pass
     # 로그 발생에 대한 빈도(인터벌), 규칙적(fixed), 불규칙적(random)
     # 클래스 외부에서는 없다고 판단(1번인자 self 아님)
-    def get_interval_time(self,mode,interval):
+    def get_interval_time(self,mode,interval): # 여기서 self는 자기 자신을 가리키는 포인터 역할인데 클래스안에서 생성된 함수이기 때문에 self를 붙여준다
         if mode == 'fixed':
             return interval # 고정 주기로 로그 발생
         return random.uniform(0.1, interval*2) # 0.1 ~ 고정주기*2배 : 무작위성 

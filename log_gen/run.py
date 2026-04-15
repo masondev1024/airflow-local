@@ -54,5 +54,6 @@ if __name__ == '__main__':
     }
 
     # 함수 실행
-    make_log(config, log_gen)
-    make_one_log()
+
+    result = make_one_log()
+    print(result)
