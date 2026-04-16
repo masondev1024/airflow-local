@@ -22,14 +22,12 @@ REGION     = 'ap-northeast-2'
 # 3. 클라이언트 생성
 def get_client( service_name='firehose', is_in_aws=True ):
     if not is_in_aws:
-        #    AWS 외부에서 진행
         session   = boto3.Session(
             aws_access_key_id     = ACCESS_KEY,
             aws_secret_access_key = SECRET_KEY,
             region_name           = REGION
         )
         return session.client(service_name)    
-    #   AWS 내부에서 진행
     return boto3.client(service_name, region_name = REGION)
 
 kinesis = get_client('kinesis', False)
@@ -47,18 +45,13 @@ def gen_stock_data():
     }
 
 # 5. 데이터 전송
-print('stock 거래 데이터 전송 시작...')
 try:
     while True:
-        # 데이터 생성
         data = gen_stock_data()
         kinesis.put_record(
-            # 스트림 이름
+            # TODO:Flink 스트림 이름 수정
             StreamName = "de-ai-06-an2-kds-stock-input",
-            # 데이터 (객체 직렬화하여 문자열 제공)
             Data = json.dumps( data ),
-            # 티커별로 샤드(고속도로의 차선) 분산하여 kinesis에서 전달
-            # 티커가 6개 이므로 샤드를 6개(6차선도로를 구성, 6개의 줄기를 구성)하여 개별 데이터 전송
             PartitionKey = data['ticker'] # 해당 컬럼의 고유값의 개수만큼 조각(샤드, 전용 차선)구성
         )
         # 로그
