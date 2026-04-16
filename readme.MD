@@ -12,17 +12,36 @@
 
                 # airflow상에 mysql 인식을 위해서 추가 설치
                 pip install apache-airflow-providers-mysql
+
             ```
 
 # 로그 제너레이터
     - 설치
-        pip install faker
-
+        ```
+            pip install faker
+        ```
     - 구조
-    ```
-        /log_gen
-        L log_generator.py  : 로그 생성 클래스 모듈 포함
-        L run.py            : 생성 코드 샘플
-    ```
+        ````
+            /log_gen
+            L log_generator.py : 로그 생성 클레스 모듈 포함
+            L run.py           : 생성 코드 샘플
+        ````
+    - 산업별(금융, 이커머스 ,.. ) 로그 생성 클레스 모듈
+    - 실행
+        ```
+            # 워킹 디렉토리(작업 폴더) -> 엔트리포인트
+            cd log_gen
+            ~/log_gen> pyton run.py
+        ```
 
-    - 산업별(금융, 이커머스,...) 모듈 생성
+# .env git에서 제거
+    ```
+        # 캐싱 제거 (터미널에서 실행)
+        git rm --cached .env
+
+        # aws 브런치에서 진행
+        # 스테이징 -> 커밋 -> 푸시
+        git add .
+        git commit -m "Feat: .env 캐시 제거"
+        git push
+    ```
