@@ -37,7 +37,7 @@ def gen_stock_data():
     ticker = ['NVDA', 'GOOGL', 'AAPL', 'TSLA', 'AMZN', 'MSFT']
     # 종목별 특정 시간(기간)동안 평균가 연산 => s3 전달 목표
     return {
-        "event_time": datetime.now().isoformat(),
+        "event_time": datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3],
         "ticker": random.choice(ticker), # 체크
         "price": round( random.uniform(100, 1000), 2), # 체크
         "volume": random.randint(1, 100),

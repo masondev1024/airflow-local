@@ -1,11 +1,6 @@
 # 재플린에서 flink 인터프린터 상황에서 파이썬 사용시 선언문
 %flink.pyflink
 
-'''
-# 내부적으로 준비되어 있음 -> 바로 사용 가능
-settings = EnvironmentSettings.new_instance().in_streaming_mode().build()
-st_env = TableEnvironment.create(settings)
-'''
 # st_env => 자체적으로 준비 되어 있는 객체 사용(전역변수)
 # 1. 입력 테이블 정의
 st_env.execute_sql("""
@@ -16,7 +11,7 @@ st_env.execute_sql("""
         WATERMARK FOR event_time AS event_time - INTERVAL '1' SECOND
     ) WITH (
         'connector' = 'kinesis',
-        'stream' = 'de-ai-30-an2-kds-stock-input',
+        'stream' = 'de-ai-06-an2-kds-stock-input',
         'aws.region' = 'ap-northeast-2',
         'scan.stream.initpos' = 'LATEST',
         'format' = 'json'
@@ -31,7 +26,7 @@ st_env.execute_sql("""
         window_time TIMESTAMP(3)
     ) WITH (
         'connector' = 'kinesis',
-        'stream' = 'de-ai-30-an2-kds-stock-output',
+        'stream' = 'de-ai-06-an2-kds-stock-output',
         'aws.region' = 'ap-northeast-2',
         'format' = 'json'
     )
