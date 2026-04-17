@@ -57,7 +57,7 @@ try:
         kinesis.put_record(
             # 스트림 이름
             StreamName = "de-ai-06-an2-kds-stock-analysis",
-            # 데이터 (객체 직렬화하여 문자열 제공)
+            # 데이터 (객체 직렬화하여 json형태의 문자열 제공)
             Data = json.dumps( data ),
             # 티커별로 샤드(고속도로의 차선) 분산하여 kinesis에서 전달
             # 티커가 6개 이므로 샤드를 6개(6차선도로를 구성, 6개의 줄기를 구성)하여 개별 데이터 전송

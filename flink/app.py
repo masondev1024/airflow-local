@@ -13,7 +13,8 @@
 - 원본데이터 -> KDS(input) -> lambda service(Serverless) -> KDS(output) -> firehose -> s3
 '''
 import os
-from flink.table import EnvironmentSettings, TableEnvironment
+from pyflink.table import EnvironmentSettings, TableEnvironment
+
 
 def main():
     # 1. 환경 설정, 스트리밍 데이터 처리 방식에 대한 구성
@@ -22,8 +23,7 @@ def main():
     # 데이터를 한번에 일괄 처리 => 배치방식(X), 실시간(지속적) 데이터를 처리 => 스트리밍방식 (O)
     setting = EnvironmentSettings.new_instance().in_streaming_mode().build()
     # SQL과 유사한 방식으로 데이터를 다룰수 있는 객체
-    t_env = TableEnvironment( setting )
-    
+    t_env = TableEnvironment.create( setting )
     '''
         로그 원문 1개
         {   
@@ -63,7 +63,7 @@ def main():
             avg_time TIMESTAMP(3)
         ) with (
             "connector" = "kinesis",
-            "stream"    = "de-ai-06-an2-kds-stock-input",
+            "stream"    = "de-ai-06-an2-kds-stock-output",
             "aws.region"= "ap-northeast-2",
             "scan.stream.initpos" = "LATEST",
             "format"    = "json"
