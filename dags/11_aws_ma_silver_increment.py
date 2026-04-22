@@ -1,7 +1,10 @@
 '''
 - ma 에서 silver 단계로 넘어가는 과정에서, 데이터가 kinesis로 잘 들어오는지 확인
 - silver level에서 데이터를 계속 증분한다
-
+- dag를 실행시키면 -> silver 테이블이 존재하지 않으면 -> 테이블 생성 -> 매시간 10시에 해당 시간대의 데이터만 골라서 silver 테이블에 삽입
+- 여기서 증분은 기존 데이터에 추가되는 형태로 삽입하는 것을 의미 -> 기존 데이터는 유지하면서 새로운 데이터가 추가되는 형태
+- 그러면 중복 데이터가 삽입될 수 있는데, 중복 데이터가 삽입되는 것을 방지하기 위해서 event_id를 활용 -> event_id는 고유한 값이므로, event_id를 기준으로 중복을 제거하는 방식으로 증분 작업 수행
+- 중복 제거하는 쿼리는 insert 쿼리 내에서 -> row_number() over (partition by event_id order by event_time desc) as rn -> where rn = 1
 '''
 
 # 1. 모듈 가져오기
@@ -86,7 +89,7 @@ with DAG(
             WHERE year = '{{ execution_date.format("YYYY") }}'
             AND month = '{{ execution_date.format("MM") }}'
             AND day = '{{ execution_date.format("DD") }}'
-            AND hour = '{{ execution_date.format("HH") }}';
+            AND hour = '10';
         """,
         params={
             'database_bronze': DATABASE_BRONZE,
