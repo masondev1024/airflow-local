@@ -62,13 +62,13 @@ def gen_data(store_id):
         "event_time": current_utc_time, # 현재시간(이벤트 발생시간)
         "source_ip": fake.ipv4(),       # 클라이언트의 접속 IP(가짜)
         "user_agent": fake.user_agent(),# 클라이언트의 접속 브라우저 타입(가짜)
-        "data": json.dumps({            # 상세 데이터 => dict 내에 dict 구성, 객체 직렬화추가
-            "user_id": f"user_{random.randint(100, 999)}", # 사용자 id (중복발생가능)
-            "item_id": selected_item["item_id"],           # 구매 제품
-            "price": selected_item["price"],               # 단가
-            "qty": qty,                                    # 수량     
-            "store_id": "gwangmyeong-01"                   # 매장번호(오프/온라인 포함)
-        }),
+        "data": {              # 상세 데이터 => dict내에 dict 구성, 객체 직렬화추가
+          "user_id" : f"user_{random.randint(100, 999)}", # 사용자 id (사용자별로 여러번구매)
+          "item_id" : selected_item["item_id"],           # 구매 제품
+          "price"   : selected_item["price"],             # 단가
+          "qty"     : qty,                                # 수량
+          "store_id": store_id                          # 매장번호(오프/온라인 포함) 
+        },
         "ingested_at": current_utc_time                    # 로그 발생시간(event_time과 동일)
     }
     return raw_log
@@ -102,7 +102,7 @@ def run_producer(i, store_id):
         while True:
             log_entry = gen_data(store_id)
             if send_to_kinesis(log_entry):
-                print(f'{log_entry["event_time"]}   전송 성공   {store_id}   {log_entry["data"][:20]}')
+                print(f'{log_entry["event_time"]}   전송 성공   {store_id} ')
             time.sleep( random.uniform(0.5, 1.5) )
 
     except KeyboardInterrupt:
